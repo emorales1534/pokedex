@@ -4,18 +4,26 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"fmt"
 )
 
+// ListLocations -
 func (c *Client) ListLocations(pageURL *string) (RespShallowLocations, error) {
-	url := baseUrl + "/locatoin-area"
-
+	url := baseURL + "/location-area"
 	if pageURL != nil {
 		url = *pageURL
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	cachedLocations, ok := c.cache.Get(url)
+	if ok {
+		locationsResp := RespShallowLocations{}
+		err := json.Unmarshal(cachedLocations, &locationsResp)
+		if err != nil {
+			return RespShallowLocations{}, err
+		}
+		return locationsResp, nil
+	}
 
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return RespShallowLocations{}, err
 	}
@@ -24,12 +32,7 @@ func (c *Client) ListLocations(pageURL *string) (RespShallowLocations, error) {
 	if err != nil {
 		return RespShallowLocations{}, err
 	}
-
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 399 {
-		return RespShallowLocations{}, fmt.Errorf("bad status code:%v", resp.StatusCode)
-	}
 
 	dat, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -41,9 +44,9 @@ func (c *Client) ListLocations(pageURL *string) (RespShallowLocations, error) {
 	if err != nil {
 		return RespShallowLocations{}, err
 	}
-	
-	return locationsResp, nil
-	
-}
 
+	c.cache.Add(url, dat)
+
+	return locationsResp, nil
+}
 

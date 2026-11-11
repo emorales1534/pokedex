@@ -35,18 +35,22 @@ func (c *Cache) Get (key string) ([]byte, bool) {
 	if !ok {
 		return nil, false
 	}
-	return val, true
+	return val.val, true
 }
 
 func (c *Cache) reapLoop () {
 	ticker := time.NewTicker(c.interval)
 	for range ticker.C {
-		c.Lock()
-		for key, val := range c.caches {
-			if time.Since(val.createdAt) > c.interval {
-				delete(c.caches, key)
-			}
+		c.reap(time.Now(), c.interval)
+	}
+}
+
+func (c *Cache) reap(now time.Time, maxAge time.Duration) {
+	c.Lock()
+	defer c.Unlock()
+	for key, val := range c.caches {
+		if val.createdAt.Before(now.Add(-maxAge)) {
+			delete(c.caches, key)
 		}
-		c.Unlock()
 	}
 }
